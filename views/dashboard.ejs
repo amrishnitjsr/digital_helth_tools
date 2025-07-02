@@ -70,14 +70,43 @@
       font-weight: 600;
       transition: background-color 0.3s ease;
     }
-    button.upload-btn:hover {
-      background-color: #004d40;
+    button.upload-btn:disabled {
+      background-color: #999;
+      cursor: not-allowed;
     }
-    #msg {
-      text-align: center;
+    #msg-container {
+      max-width: 600px;
+      margin: 1rem auto 0 auto;
+      padding: 0.5rem 1rem;
+      background-color: #e0f2f1;
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
       font-weight: 600;
-      margin-top: 1rem;
       color: #00796b;
+      word-break: break-word;
+      flex-direction: column;
+    }
+    #msg-container.error {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+    #msg-container button {
+      padding: 0.3rem 0.7rem;
+      border: none;
+      border-radius: 4px;
+      background-color: #00796b;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      transition: background-color 0.3s ease;
+    }
+    #msg-container button:hover {
+      background-color: #004d40;
     }
     footer {
       background: #263238;
@@ -105,9 +134,13 @@
       <input type="email" id="email" placeholder="Email" required />
       <input type="text" id="purpose" placeholder="Purpose" required />
       <input type="file" id="file" required />
-      <button type="button" class="upload-btn" onclick="upload()">Upload</button>
-      <p id="msg"></p>
+      <button id="upload-btn" class="upload-btn" onclick="upload()">Upload</button>
     </div>
+  </div>
+
+  <div id="msg-container">
+    <span id="msg-text"></span>
+    <button id="copy-btn">Copy</button>
   </div>
 
   <footer>
@@ -122,13 +155,14 @@
 
     async function upload() {
       const token = localStorage.getItem("token");
+      const uploadBtn = document.getElementById("upload-btn");
+
       if (!token) {
         alert("Please login again.");
         window.location.href = "/";
         return;
       }
 
-      // Validate required inputs
       const name = document.getElementById("name").value.trim();
       const age = document.getElementById("age").value.trim();
       const contact = document.getElementById("contact").value.trim();
@@ -141,6 +175,9 @@
         return;
       }
 
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = "Uploading...";
+
       const formData = new FormData();
       formData.append("file", fileInput.files[0]);
       formData.append("name", name);
@@ -148,6 +185,10 @@
       formData.append("contact", contact);
       formData.append("email", email);
       formData.append("purpose", purpose);
+
+      const msgContainer = document.getElementById("msg-container");
+      const msgText = document.getElementById("msg-text");
+      const copyBtn = document.getElementById("copy-btn");
 
       try {
         const res = await fetch("/api/upload", {
@@ -158,16 +199,39 @@
           body: formData,
         });
 
-        if (!res.ok) {
-          throw new Error("Network response was not ok");
-        }
+        if (!res.ok) throw new Error("Network response was not ok");
 
         const data = await res.json();
 
         if (data.success) {
-          document.getElementById("msg").style.color = "#00796b";
-          document.getElementById("msg").innerText = "Uploaded successfully! Preview URL: " + data.previewURL;
-          // Clear inputs after successful upload
+          const fullURL = data.previewURL;
+          const shortURL = fullURL.length > 60 ? fullURL.substring(0, 45) + '...' : fullURL;
+
+          msgText.innerHTML = `
+            <div style="text-align: center; margin-bottom: 0.3rem;">
+              Uploaded successfully! Preview URL:
+            </div>
+            <div style="font-size: 1rem; color: #000;">
+              <a href="${fullURL}" target="_blank" style="color: #000; text-decoration: underline;">
+                ${shortURL}
+              </a>
+            </div>
+          `;
+
+          msgContainer.style.display = "flex";
+          msgContainer.classList.remove("error");
+          copyBtn.style.display = "inline-block";
+          copyBtn.textContent = "Copy";
+
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(fullURL).then(() => {
+              copyBtn.textContent = "Copied!";
+              setTimeout(() => (copyBtn.textContent = "Copy"), 2000);
+            }).catch(() => {
+              alert("Failed to copy.");
+            });
+          };
+
           document.getElementById("name").value = "";
           document.getElementById("age").value = "";
           document.getElementById("contact").value = "";
@@ -175,16 +239,22 @@
           document.getElementById("purpose").value = "";
           fileInput.value = "";
         } else {
-          document.getElementById("msg").style.color = "red";
-          document.getElementById("msg").innerText = data.message || "Upload failed";
+          msgText.textContent = data.message || "Upload failed";
+          msgContainer.style.display = "flex";
+          msgContainer.classList.add("error");
+          copyBtn.style.display = "none";
         }
       } catch (error) {
-        document.getElementById("msg").style.color = "red";
-        document.getElementById("msg").innerText = "Upload error: " + error.message;
+        msgText.textContent = "Upload error: " + error.message;
+        msgContainer.style.display = "flex";
+        msgContainer.classList.add("error");
+        copyBtn.style.display = "none";
         console.error("Upload error:", error);
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = "Upload";
       }
     }
   </script>
-
 </body>
 </html>

@@ -12,10 +12,10 @@ exports.uploadFile = async (req, res) => {
 
     // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: "patient_files"
+      folder: "patient_files",
     });
 
-    // Delete local temp file
+    // Delete local temp file asynchronously
     fs.unlink(req.file.path, (err) => {
       if (err) console.error("Temp file delete failed:", err);
     });
@@ -30,14 +30,13 @@ exports.uploadFile = async (req, res) => {
       contact,
       email,
       purpose,
-      user: req.user || null,
-      uploadedAt: new Date()
+      user: req.user.id,      // <-- FIXED here: pass only user id string
+      uploadedAt: new Date(),
     });
 
-    // Log what is saved
     console.log("📦 Saved patient record:", newFile);
 
-    // Respond
+    // Respond success
     res.json({
       success: true,
       message: "File uploaded successfully",
@@ -47,16 +46,15 @@ exports.uploadFile = async (req, res) => {
         age,
         contact,
         email,
-        purpose
-      }
+        purpose,
+      },
     });
-
   } catch (err) {
     console.error("❌ Upload error:", err);
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: err.message
+      error: err.message,
     });
   }
 };

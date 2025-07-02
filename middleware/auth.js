@@ -1,37 +1,33 @@
-const express = require("express");
-const router = express.Router();
+// middleware/authenticate.js
+
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const User = require("../models/User"); // Make sure you have this model
 
-// Register Route
-router.post("/register", async (req, res) => {
-  try {
-    const { email, password } = req.body;
+function authenticate(req, res, next) {
+  let token = null;
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists." });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = new User({
-      email,
-      password: hashedPassword,
-    });
-
-    await user.save();
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
-
-    res.status(201).json({ token });
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
+  // 1. Check Authorization header
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer ")
+  ) {
+    token = req.headers.authorization.split(" ")[1];
   }
-});
+  // 2. Fallback to cookie token
+  else if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
 
-module.exports = router;
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized - no token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // attach user info to request
+    next();
+  } catch (err) {
+    return res.status(403).json({ message: "Forbidden - invalid token" });
+  }
+}
+
+module.exports = authenticate;
